@@ -103,6 +103,10 @@ class TimeSeriesHandler(BaseHTTPRequestHandler):
                 self._handle_get_sources()
             elif path == '/api/shards':
                 self._handle_shard_info()
+            elif path == '/api/storage/metrics':
+                self._handle_storage_metrics()
+            elif path == '/api/storage/retention':
+                self._handle_get_retention()
             elif path == '/api/detector/state':
                 self._handle_detector_state()
             elif path == '/':
@@ -132,6 +136,10 @@ class TimeSeriesHandler(BaseHTTPRequestHandler):
                 self._handle_add_source()
             elif path == '/api/simulate':
                 self._handle_simulate()
+            elif path == '/api/storage/retention':
+                self._handle_set_retention()
+            elif path == '/api/storage/cleanup':
+                self._handle_run_cleanup()
             else:
                 self._send_error("Not found", 404)
         except Exception as e:
@@ -408,6 +416,62 @@ class TimeSeriesHandler(BaseHTTPRequestHandler):
         info = self.storage.get_shard_info()
         self._send_json({"shards": info, "count": len(info)})
 
+    def _handle_storage_metrics(self):
+        """Get per-metric storage usage plus retention policy summary."""
+        metrics = self.storage.get_metric_storage_info()
+        total_bytes = sum(m["size_bytes"] for m in metrics)
+        total_shards = sum(m["shard_count"] for m in metrics)
+        self._send_json({
+            "metrics": metrics,
+            "count": len(metrics),
+            "total_size_bytes": total_bytes,
+            "total_size": TimeSeriesStorage._format_size(total_bytes),
+            "total_shards": total_shards,
+            "retention": self.storage.get_retention_policy(),
+            "stats": self.storage.get_stats(),
+        })
+
+    def _handle_get_retention(self):
+        """Get the data retention / auto-cleanup policy."""
+        self._send_json({"retention": self.storage.get_retention_policy()})
+
+    def _handle_set_retention(self):
+        """Configure the data retention / auto-cleanup policy."""
+        body = self._read_body()
+        try:
+            retention_days = int(body.get("retention_days", 7))
+        except (TypeError, ValueError):
+            self._send_error("'retention_days' must be an integer")
+            return
+        enabled = bool(body.get("enabled", False))
+
+        try:
+            policy = self.storage.set_retention_policy(enabled, retention_days)
+        except ValueError as e:
+            self._send_error(str(e))
+            return
+        self._send_json({"success": True, "retention": policy})
+
+    def _handle_run_cleanup(self):
+        """Run an immediate cleanup of expired shard files."""
+        body = self._read_body()
+        retention_days = body.get("retention_days")
+        if retention_days is not None:
+            try:
+                retention_days = int(retention_days)
+            except (TypeError, ValueError):
+                self._send_error("'retention_days' must be an integer")
+                return
+        else:
+            retention_days = self.storage.get_retention_policy()["retention_days"]
+
+        try:
+            result = self.storage.cleanup_expired(retention_days)
+        except ValueError as e:
+            self._send_error(str(e))
+            return
+        self._send_json({"success": True, "result": result})
+
     def _handle_detector_state(self):
         """Get anomaly detector state."""
         state = self.detector.get_state_info()
@@ -568,6 +632,7 @@ def _run_simulation(storage: TimeSeriesStorage, detector: AnomalyDetector,
 # ---- Server Startup ----
 
 SERVER_START_TIME = time.time()
+RETENTION_CLEANUP_INTERVAL = 3600  # Run the auto-cleanup sweep hourly
 
 
 def create_default_rules(storage: TimeSeriesStorage):
@@ -726,6 +791,20 @@ def run_server(host: str = "0.0.0.0", port: int = 8080, data_dir: str = "./data"
 
     sim_thread = threading.Thread(target=auto_simulate, daemon=True)
     sim_thread.start()
+
+    # Periodically delete expired shard files when retention is enabled
+    def auto_cleanup():
+        while True:
+            time.sleep(RETENTION_CLEANUP_INTERVAL)
+            try:
+                policy = storage.get_retention_policy()
+                if policy.get("enabled"):
+                    storage.cleanup_expired(policy["retention_days"])
+            except Exception as e:
+                print(f"Scheduled cleanup error: {e}")
+
+    cleanup_thread = threading.Thread(target=auto_cleanup, daemon=True)
+    cleanup_thread.start()
 
     try:
         server.serve_forever()

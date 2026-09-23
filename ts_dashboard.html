@@ -905,6 +905,134 @@ textarea.form-input {
   gap: 6px;
 }
 
+/* ---- Storage usage & retention ---- */
+.storage-summary {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.storage-summary .stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storage-summary .stat-item .stat-k {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.storage-summary .stat-item .stat-v {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.retention-bar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.retention-bar .form-group {
+  margin: 0;
+}
+
+.retention-bar .retention-days {
+  width: 110px;
+}
+
+.retention-bar .retention-spacer {
+  flex: 1;
+}
+
+.retention-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.retention-hint code {
+  font-family: var(--font-mono);
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--warning);
+}
+
+.retention-status {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 10px;
+}
+
+.storage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.storage-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.storage-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.storage-table tr:last-child td {
+  border-bottom: none;
+}
+
+.storage-table .metric-name {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.storage-table .num {
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+.usage-cell {
+  min-width: 140px;
+}
+
+.usage-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.usage-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
 /* ---- Heatmap ---- */
 .heatmap-legend {
   display: flex;
@@ -1178,6 +1306,65 @@ textarea.form-input {
             <span class="badge badge-info" id="sourceCount">0 个</span>
           </div>
           <div class="card-body" id="sourcesList"></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <div class="card-title">🗄️ 存储占用与数据清理</div>
+            <button class="btn btn-sm" onclick="loadStorageUsage()">刷新</button>
+          </div>
+          <div class="card-body">
+            <div class="storage-summary">
+              <div class="stat-item">
+                <span class="stat-k">磁盘总占用</span>
+                <span class="stat-v" id="storageTotalSize">-</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-k">分片文件数</span>
+                <span class="stat-v" id="storageTotalShards">-</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-k">指标数</span>
+                <span class="stat-v" id="storageMetricCount">-</span>
+              </div>
+            </div>
+
+            <div class="retention-bar">
+              <div class="form-group">
+                <label class="form-label">自动清理</label>
+                <label class="form-checkbox" style="margin-top:6px">
+                  <input type="checkbox" id="retentionEnabled">
+                  启用（每小时自动执行）
+                </label>
+              </div>
+              <div class="form-group retention-days">
+                <label class="form-label">数据保留天数</label>
+                <input class="form-input" id="retentionDays" type="number" min="1" max="36500" value="7">
+              </div>
+              <div class="retention-spacer"></div>
+              <button class="btn btn-primary" onclick="saveRetentionPolicy()">保存策略</button>
+              <button class="btn btn-danger" onclick="runCleanup()">🧹 立即清理</button>
+            </div>
+            <div class="retention-hint">
+              清理会删除整个小时都早于保留窗口的分片文件；<code>当前小时及保留期内的分片不会被删除</code>，正在写入的数据不受影响。
+            </div>
+            <div class="retention-status" id="retentionStatus">策略加载中...</div>
+
+            <div style="overflow-x:auto;margin-top:14px">
+              <table class="storage-table">
+                <thead>
+                  <tr>
+                    <th>指标</th>
+                    <th class="num">分片数</th>
+                    <th style="width:180px">存储占用</th>
+                    <th>最早分片</th>
+                    <th>最新分片</th>
+                  </tr>
+                </thead>
+                <tbody id="storageMetricsBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <div class="grid-2">
@@ -1524,6 +1711,7 @@ let state = {
   alerts: [],
   rules: [],
   sources: {},
+  storageUsage: null,
   selectedDashMetrics: new Set(['cpu.usage', 'memory.usage']),
   historyData: null,
   timeRangeMinutes: 15,
@@ -1603,7 +1791,10 @@ async function refreshCurrentPage() {
     case 'alerts': await loadAlerts(); break;
     case 'history': break; // Manual refresh
     case 'rules': await loadRules(); break;
-    case 'sources': await loadSources(); break;
+    case 'sources':
+      await loadSources();
+      await loadStorageUsage();
+      break;
   }
   updateHeaderStats();
 }
@@ -1903,6 +2094,121 @@ async function deleteSource(id) {
   if (result?.success) {
     showToast('已删除', 'success');
     await loadSources();
+  }
+}
+
+// ====== Storage Usage & Retention ======
+async function loadStorageUsage() {
+  const data = await api('/api/storage/metrics');
+  if (!data) return;
+  state.storageUsage = data;
+  renderStorageUsage(data);
+  renderRetention(data.retention);
+}
+
+function renderStorageUsage(data) {
+  document.getElementById('storageTotalSize').textContent = data.total_size || '0 B';
+  document.getElementById('storageTotalShards').textContent = data.total_shards ?? 0;
+  document.getElementById('storageMetricCount').textContent = data.count ?? 0;
+
+  const body = document.getElementById('storageMetricsBody');
+  const metrics = data.metrics || [];
+  if (!metrics.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">暂无存储数据</td></tr>';
+    return;
+  }
+
+  const maxSize = Math.max(...metrics.map(m => m.size_bytes), 1);
+  body.innerHTML = metrics.map(m => {
+    const pct = maxSize ? (m.size_bytes / maxSize * 100) : 0;
+    return `
+      <tr>
+        <td class="metric-name">${m.metric}</td>
+        <td class="num">${m.shard_count}</td>
+        <td class="usage-cell">
+          <div style="display:flex;justify-content:space-between;font-family:var(--font-mono)">
+            <span>${m.size}</span>
+          </div>
+          <div class="usage-bar-track">
+            <div class="usage-bar-fill" style="width:${pct.toFixed(1)}%"></div>
+          </div>
+        </td>
+        <td>${formatShardTime(m.oldest_shard_iso)}</td>
+        <td>${formatShardTime(m.newest_shard_iso)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function formatShardTime(iso) {
+  if (!iso) return '<span style="color:var(--text-muted)">-</span>';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:00`;
+}
+
+function renderRetention(r) {
+  if (!r) return;
+  document.getElementById('retentionEnabled').checked = !!r.enabled;
+  // Don't overwrite the input while the user is editing it
+  const daysInput = document.getElementById('retentionDays');
+  if (document.activeElement !== daysInput) {
+    daysInput.value = r.retention_days ?? 7;
+  }
+
+  const lines = [
+    `当前策略：${r.enabled ? '<span style="color:var(--success)">已启用自动清理</span>' : '<span style="color:var(--text-muted)">未启用</span>'} · 保留 ${r.retention_days ?? 7} 天`,
+  ];
+  if (r.updated_at) {
+    lines.push(`策略更新于 ${new Date(r.updated_at).toLocaleString()}`);
+  }
+  const lc = r.last_cleanup;
+  if (lc && lc.ran_at_iso) {
+    lines.push(
+      `上次清理：${new Date(lc.ran_at_iso).toLocaleString()} · 删除 ${lc.deleted_shards} 个分片 · 释放 ${lc.freed}`
+    );
+  }
+  document.getElementById('retentionStatus').innerHTML = lines.join('<br>');
+}
+
+async function saveRetentionPolicy() {
+  const enabled = document.getElementById('retentionEnabled').checked;
+  const days = parseInt(document.getElementById('retentionDays').value, 10);
+  if (!Number.isInteger(days) || days < 1) {
+    showToast('保留天数必须是大于 0 的整数', 'error');
+    return;
+  }
+  const result = await api('/api/storage/retention', {
+    method: 'POST',
+    body: { enabled, retention_days: days },
+  });
+  if (result?.success) {
+    showToast(`清理策略已保存（保留 ${days} 天${enabled ? '，自动清理已启用' : ''}）`, 'success');
+    renderRetention(result.retention);
+  } else {
+    showToast('策略保存失败', 'error');
+  }
+}
+
+async function runCleanup() {
+  const days = parseInt(document.getElementById('retentionDays').value, 10);
+  if (!Number.isInteger(days) || days < 1) {
+    showToast('保留天数必须是大于 0 的整数', 'error');
+    return;
+  }
+  if (!confirm(`将删除 ${days} 天前的过期分片文件，保留期内及当前数据不会被删除。确定执行?`)) return;
+
+  const result = await api('/api/storage/cleanup', {
+    method: 'POST',
+    body: { retention_days: days },
+  });
+  if (result?.success) {
+    const r = result.result;
+    showToast(`清理完成：删除 ${r.deleted_shards} 个分片，释放 ${r.freed}`, 'success');
+    await loadStorageUsage();
+  } else {
+    showToast('清理失败', 'error');
   }
 }
 

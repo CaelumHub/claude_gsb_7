@@ -8,6 +8,7 @@ Time-Series Storage Engine
 
 import json
 import os
+import re
 import time
 import threading
 from datetime import datetime, timezone, timedelta
@@ -257,6 +258,192 @@ class TimeSeriesStorage:
                         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
                     })
         return sorted(info, key=lambda x: x["file"])
+
+    # ---- Storage Usage & Retention ----
+
+    # Shard files look like: <safe_metric>_YYYYMMDD_HH.json
+    _SHARD_RE = re.compile(r"^(.+)_(\d{8})_(\d{2})\.json$")
+
+    @staticmethod
+    def _format_size(num_bytes: int) -> str:
+        """Format a byte count as a human-readable string."""
+        size = float(num_bytes)
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024 or unit == "TB":
+                return f"{size:.2f} {unit}" if unit != "B" else f"{int(size)} B"
+            size /= 1024
+        return f"{size:.2f} TB"
+
+    def get_metric_storage_info(self) -> List[Dict[str, Any]]:
+        """Get per-metric on-disk storage usage, aggregated from shard files."""
+        agg: Dict[str, Dict[str, Any]] = {}
+
+        if os.path.exists(self.ts_dir):
+            for fname in os.listdir(self.ts_dir):
+                m = self._SHARD_RE.match(fname)
+                if not m:
+                    continue
+                metric, day_part, hour_part = m.group(1), m.group(2), m.group(3)
+                try:
+                    shard_dt = datetime.strptime(
+                        f"{day_part}{hour_part}", "%Y%m%d%H"
+                    ).replace(tzinfo=timezone.utc)
+                    shard_hour = shard_dt.timestamp()
+                except ValueError:
+                    shard_hour = 0
+
+                fpath = os.path.join(self.ts_dir, fname)
+                try:
+                    fsize = os.path.getsize(fpath)
+                except OSError:
+                    continue
+
+                entry = agg.setdefault(metric, {
+                    "metric": metric,
+                    "size_bytes": 0,
+                    "shard_count": 0,
+                    "oldest_shard": None,
+                    "newest_shard": None,
+                })
+                entry["size_bytes"] += fsize
+                entry["shard_count"] += 1
+                if entry["oldest_shard"] is None or shard_hour < entry["oldest_shard"]:
+                    entry["oldest_shard"] = shard_hour
+                if entry["newest_shard"] is None or shard_hour > entry["newest_shard"]:
+                    entry["newest_shard"] = shard_hour
+
+        # Include metrics that only live in the write cache / memory
+        with self._cache_lock:
+            cached_metrics = list(self._cache.keys())
+        for metric in cached_metrics:
+            if metric not in agg:
+                agg[metric] = {
+                    "metric": metric,
+                    "size_bytes": 0,
+                    "shard_count": 0,
+                    "oldest_shard": None,
+                    "newest_shard": None,
+                }
+
+        result = list(agg.values())
+        for entry in result:
+            entry["size"] = self._format_size(entry["size_bytes"])
+            entry["oldest_shard_iso"] = (
+                datetime.fromtimestamp(entry["oldest_shard"], tz=timezone.utc).isoformat()
+                if entry["oldest_shard"] else None
+            )
+            entry["newest_shard_iso"] = (
+                datetime.fromtimestamp(entry["newest_shard"], tz=timezone.utc).isoformat()
+                if entry["newest_shard"] else None
+            )
+        return sorted(result, key=lambda x: x["size_bytes"], reverse=True)
+
+    def get_retention_policy(self) -> Dict[str, Any]:
+        """Get the configured data retention / auto-cleanup policy."""
+        policy = self.metadata.get("retention_policy", {})
+        return {
+            "enabled": policy.get("enabled", False),
+            "retention_days": policy.get("retention_days", 7),
+            "updated_at": policy.get("updated_at"),
+            "last_cleanup": policy.get("last_cleanup"),
+        }
+
+    def set_retention_policy(self, enabled: bool, retention_days: int) -> Dict[str, Any]:
+        """Persist the data retention / auto-cleanup policy."""
+        retention_days = int(retention_days)
+        if retention_days < 1 or retention_days > 36500:
+            raise ValueError("retention_days must be between 1 and 36500")
+
+        policy = dict(self.metadata.get("retention_policy", {}))
+        policy.update({
+            "enabled": bool(enabled),
+            "retention_days": retention_days,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+        self.metadata["retention_policy"] = policy
+        self._save_json(self.meta_file, self.metadata)
+        return self.get_retention_policy()
+
+    def cleanup_expired(self, retention_days: Optional[int] = None) -> Dict[str, Any]:
+        """Delete hourly shard files whose entire hour bucket is older than the
+        retention window. The shard covering the current hour is never removed,
+        so in-window data (including the data being written right now) is safe.
+        """
+        # Make sure buffered late data is on disk before deciding what is expired
+        self.force_flush()
+
+        if retention_days is None:
+            retention_days = self.get_retention_policy()["retention_days"]
+        retention_days = int(retention_days)
+        if retention_days < 1:
+            raise ValueError("retention_days must be >= 1")
+
+        now = time.time()
+        cutoff = now - retention_days * 86400
+        # Only whole completed hour buckets are eligible for deletion
+        cutoff_hour_floor = (int(cutoff) // 3600) * 3600
+
+        deleted_files: List[str] = []
+        deleted_bytes = 0
+        errors: List[str] = []
+
+        if os.path.exists(self.ts_dir):
+            for fname in os.listdir(self.ts_dir):
+                m = self._SHARD_RE.match(fname)
+                if not m:
+                    continue
+                day_part, hour_part = m.group(2), m.group(3)
+                try:
+                    shard_dt = datetime.strptime(
+                        f"{day_part}{hour_part}", "%Y%m%d%H"
+                    ).replace(tzinfo=timezone.utc)
+                    shard_hour = shard_dt.timestamp()
+                except ValueError:
+                    continue
+
+                # Shard covers [shard_hour, shard_hour + 1h); it is expired
+                # only when the whole bucket lies before the cutoff.
+                if shard_hour + 3600 > cutoff_hour_floor:
+                    continue
+
+                fpath = os.path.join(self.ts_dir, fname)
+                try:
+                    fsize = os.path.getsize(fpath)
+                    os.remove(fpath)
+                    deleted_files.append(fname)
+                    deleted_bytes += fsize
+                except OSError as e:
+                    errors.append(f"{fname}: {e}")
+
+        # Drop matching expired points from the in-memory cache as well
+        with self._cache_lock:
+            for metric in list(self._cache.keys()):
+                before = len(self._cache[metric])
+                self._cache[metric] = [
+                    p for p in self._cache[metric] if p["t"] >= cutoff
+                ]
+                if len(self._cache[metric]) != before:
+                    self._cache[metric] = self._cache[metric][-self._max_cache_points:]
+
+        result = {
+            "retention_days": retention_days,
+            "cutoff": cutoff,
+            "cutoff_iso": datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat(),
+            "deleted_shards": len(deleted_files),
+            "deleted_bytes": deleted_bytes,
+            "freed": self._format_size(deleted_bytes),
+            "files": deleted_files,
+            "errors": errors,
+            "ran_at": now,
+            "ran_at_iso": datetime.fromtimestamp(now, tz=timezone.utc).isoformat(),
+        }
+
+        policy = dict(self.metadata.get("retention_policy", {}))
+        policy["last_cleanup"] = result
+        self.metadata["retention_policy"] = policy
+        self._save_json(self.meta_file, self.metadata)
+
+        return result
 
     # ---- Metadata (Sources) ----
 
