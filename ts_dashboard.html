@@ -1,0 +1,2358 @@
+<title>TimeScope</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1a2332;
+  --bg-card: #151d2e;
+  --bg-hover: #1e2a3d;
+  --border: #1e2d42;
+  --border-light: #253347;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-dim: #1e40af;
+  --success: #10b981;
+  --success-dim: #065f46;
+  --warning: #f59e0b;
+  --warning-dim: #78350f;
+  --danger: #ef4444;
+  --danger-dim: #7f1d1d;
+  --purple: #8b5cf6;
+  --cyan: #06b6d4;
+  --orange: #f97316;
+  --pink: #ec4899;
+  --sidebar-width: 220px;
+  --header-height: 56px;
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.4);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-primary: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-hover: #f1f5f9;
+    --border: #e2e8f0;
+    --border-light: #cbd5e1;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #94a3b8;
+    --accent: #2563eb;
+    --accent-light: #3b82f6;
+    --accent-dim: #dbeafe;
+    --success-dim: #d1fae5;
+    --warning-dim: #fef3c7;
+    --danger-dim: #fee2e2;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-lg: 0 4px 20px rgba(0,0,0,.08);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1a2332;
+  --bg-card: #151d2e;
+  --bg-hover: #1e2a3d;
+  --border: #1e2d42;
+  --border-light: #253347;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-dim: #1e40af;
+  --success-dim: #065f46;
+  --warning-dim: #78350f;
+  --danger-dim: #7f1d1d;
+  --shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.4);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100%;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.sidebar-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--accent), var(--cyan));
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.sidebar-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-dim);
+  color: var(--accent-light);
+  border-color: var(--accent);
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+}
+
+.sidebar-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  margin-right: 6px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ---- Main Content ---- */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.header {
+  height: var(--header-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.header-breadcrumb {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.header-stat .value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-light);
+}
+
+.btn-danger {
+  background: var(--danger-dim);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  background: var(--bg-primary);
+}
+
+/* ---- Cards ---- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-body {
+  padding: 16px 18px;
+}
+
+/* ---- Stats Grid ---- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+}
+
+.stat-card.blue::before { background: var(--accent); }
+.stat-card.green::before { background: var(--success); }
+.stat-card.yellow::before { background: var(--warning); }
+.stat-card.red::before { background: var(--danger); }
+.stat-card.purple::before { background: var(--purple); }
+.stat-card.cyan::before { background: var(--cyan); }
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.stat-change {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+.stat-change.up { color: var(--success); }
+.stat-change.down { color: var(--danger); }
+
+/* ---- Grid Layouts ---- */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* ---- Table ---- */
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  white-space: nowrap;
+}
+
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+tr:hover td {
+  background: var(--bg-hover);
+}
+
+/* ---- Badges ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.badge-success { background: var(--success-dim); color: var(--success); }
+.badge-warning { background: var(--warning-dim); color: var(--warning); }
+.badge-danger { background: var(--danger-dim); color: var(--danger); }
+.badge-info { background: var(--accent-dim); color: var(--accent-light); }
+.badge-purple { background: rgba(139,92,246,.15); color: var(--purple); }
+
+/* ---- Form Elements ---- */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 5px;
+}
+
+.form-input, .form-select {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  transition: border-color 0.15s;
+}
+
+.form-input:focus, .form-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+
+.form-input::placeholder {
+  color: var(--text-muted);
+}
+
+textarea.form-input {
+  min-height: 80px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.form-checkbox input {
+  accent-color: var(--accent);
+}
+
+/* ---- Toggle ---- */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: 0.2s;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.toggle input:checked + .toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle input:checked + .toggle-track .toggle-thumb {
+  left: 19px;
+  background: #fff;
+}
+
+/* ---- Chart Container ---- */
+.chart-container {
+  width: 100%;
+  height: 300px;
+  position: relative;
+}
+
+.chart-container.large {
+  height: 400px;
+}
+
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ---- Alerts ---- */
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+
+.alert-item:hover {
+  background: var(--bg-hover);
+}
+
+.alert-severity {
+  width: 4px;
+  min-height: 40px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+.alert-severity.critical { background: var(--danger); }
+.alert-severity.warning { background: var(--warning); }
+.alert-severity.info { background: var(--accent); }
+
+.alert-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.alert-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.alert-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ---- Time Range Picker ---- */
+.time-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.time-btn {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+}
+
+.time-btn:hover, .time-btn.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+
+/* ---- Rule Card ---- */
+.rule-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+
+.rule-card:hover {
+  border-color: var(--border-light);
+}
+
+.rule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.rule-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rule-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rule-meta dt {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rule-meta dd {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* ---- Tabs ---- */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.tab:hover {
+  color: var(--text-secondary);
+}
+
+.tab.active {
+  color: var(--accent-light);
+  border-bottom-color: var(--accent);
+}
+
+/* ---- Page Sections ---- */
+.page { display: none; }
+.page.active { display: block; }
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Empty State ---- */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.empty-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* ---- Toast ---- */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast-success { background: var(--success-dim); color: var(--success); border: 1px solid var(--success); }
+.toast-error { background: var(--danger-dim); color: var(--danger); border: 1px solid var(--danger); }
+.toast-info { background: var(--accent-dim); color: var(--accent-light); border: 1px solid var(--accent); }
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ---- Mobile ---- */
+.mobile-toggle {
+  display: none;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -220px;
+    top: 0;
+    bottom: 0;
+    transition: left 0.25s ease;
+    z-index: 100;
+  }
+  .sidebar.open { left: 0; }
+  .mobile-toggle { display: flex; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ---- Source Card ---- */
+.source-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: border-color 0.15s;
+}
+
+.source-card:hover {
+  border-color: var(--border-light);
+}
+
+.source-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.source-icon.api { background: var(--accent-dim); color: var(--accent-light); }
+.source-icon.sim { background: rgba(139,92,246,.15); color: var(--purple); }
+.source-icon.file { background: rgba(6,182,212,.15); color: var(--cyan); }
+
+.source-info { flex: 1; min-width: 0; }
+.source-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.source-type { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+.source-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---- Heatmap ---- */
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.heatmap-bar {
+  height: 8px;
+  width: 100px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #1e3a5f, #3b82f6, #f59e0b, #ef4444);
+}
+
+/* ---- Modal ---- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.show { display: flex; }
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  width: 90%;
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---- Metric selector chips ---- */
+.metric-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.metric-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.metric-chip:hover {
+  border-color: var(--border-light);
+}
+
+.metric-chip.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+
+/* Color coding for metric chips */
+.metric-chip[data-metric="cpu"] { --chip-color: var(--accent); }
+.metric-chip[data-metric="memory"] { --chip-color: var(--success); }
+.metric-chip[data-metric="disk"] { --chip-color: var(--warning); }
+.metric-chip[data-metric="network"] { --chip-color: var(--cyan); }
+
+.metric-chip.active[data-metric="cpu"] { background: var(--accent-dim); border-color: var(--accent); color: var(--accent-light); }
+.metric-chip.active[data-metric="memory"] { background: var(--success-dim); border-color: var(--success); color: var(--success); }
+.metric-chip.active[data-metric="disk"] { background: var(--warning-dim); border-color: var(--warning); color: var(--warning); }
+.metric-chip.active[data-metric="network"] { background: rgba(6,182,212,.15); border-color: var(--cyan); color: var(--cyan); }
+
+/* ---- Sparkline ---- */
+.sparkline-container {
+  width: 80px;
+  height: 24px;
+}
+
+/* ---- Inline Edit ---- */
+.inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-edit input {
+  flex: 1;
+}
+
+/* ---- Separator ---- */
+.separator {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
+</style>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">T</div>
+      <div>
+        <div class="sidebar-title">TimeScope</div>
+        <div class="sidebar-subtitle">v1.0.0</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <span class="nav-icon">📊</span>
+        <span>实时仪表盘</span>
+      </div>
+      <div class="nav-item" data-page="sources" onclick="switchPage('sources')">
+        <span class="nav-icon">🔌</span>
+        <span>数据源配置</span>
+      </div>
+      <div class="nav-item" data-page="history" onclick="switchPage('history')">
+        <span class="nav-icon">📈</span>
+        <span>历史查询</span>
+      </div>
+      <div class="nav-item" data-page="alerts" onclick="switchPage('alerts')">
+        <span class="nav-icon">🔔</span>
+        <span>异常告警</span>
+        <span class="nav-badge" id="alertBadge">0</span>
+      </div>
+      <div class="nav-item" data-page="rules" onclick="switchPage('rules')">
+        <span class="nav-icon">⚙️</span>
+        <span>规则管理</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="status-dot"></span>
+      <span id="serverStatus">连接中...</span>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+    <header class="header">
+      <div class="header-left">
+        <button class="mobile-toggle" onclick="toggleSidebar()">☰</button>
+        <div>
+          <div class="header-title" id="pageTitle">实时仪表盘</div>
+          <div class="header-breadcrumb" id="pageBreadcrumb">dashboard / overview</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="header-stat">
+          <span>数据点</span>
+          <span class="value" id="totalPoints">0</span>
+        </div>
+        <div class="header-stat">
+          <span>指标</span>
+          <span class="value" id="metricCount">0</span>
+        </div>
+        <div class="header-stat">
+          <span>告警</span>
+          <span class="value" id="alertCount">0</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="content" id="contentArea">
+
+      <!-- ====== Dashboard Page ====== -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="grid-2" style="margin-bottom:16px">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📈 实时指标曲线</div>
+              <div class="metric-chips" id="dashMetricChips"></div>
+            </div>
+            <div class="card-body">
+              <div class="chart-container large" id="dashLineChart"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🔥 指标热力图</div>
+            </div>
+            <div class="card-body">
+              <div class="chart-container large" id="dashHeatmap"></div>
+              <div class="heatmap-legend">
+                <span>低</span>
+                <div class="heatmap-bar"></div>
+                <span>高</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔔 最近告警</div>
+            <button class="btn btn-sm" onclick="switchPage('alerts')">查看全部 →</button>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div id="recentAlerts"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Sources Page ====== -->
+      <div class="page" id="page-sources">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="section-title">🔌 数据源配置</div>
+          <button class="btn btn-primary" onclick="showAddSourceModal()">+ 添加数据源</button>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <div class="card-title">已配置的数据源</div>
+            <span class="badge badge-info" id="sourceCount">0 个</span>
+          </div>
+          <div class="card-body" id="sourcesList"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📥 API 数据摄入</div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">摄入端点</label>
+                <input class="form-input" value="POST /api/data/ingest" readonly>
+              </div>
+              <div class="form-group">
+                <label class="form-label">批量端点</label>
+                <input class="form-input" value="POST /api/data/ingest/batch" readonly>
+              </div>
+              <div class="form-group">
+                <label class="form-label">数据格式示例</label>
+                <textarea class="form-input" readonly>{
+  "metric": "cpu.usage",
+  "value": 72.5,
+  "timestamp": 1695000000,
+  "tags": {"host": "server-01"},
+  "source": "api"
+}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📊 模拟器控制</div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">模拟指标</label>
+                <input class="form-input" id="simMetrics" value="cpu.usage, memory.usage, disk.io, network.throughput">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">持续时间 (秒)</label>
+                  <input class="form-input" id="simDuration" type="number" value="300">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">采样间隔 (秒)</label>
+                  <input class="form-input" id="simInterval" type="number" value="1">
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="startSimulation()" style="width:100%">▶ 启动模拟</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== History Page ====== -->
+      <div class="page" id="page-history">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <div class="card-title">🔍 查询条件</div>
+          </div>
+          <div class="card-body">
+            <div class="form-row" style="margin-bottom:12px">
+              <div class="form-group">
+                <label class="form-label">选择指标</label>
+                <select class="form-select" id="historyMetric"></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">降采样方法</label>
+                <select class="form-select" id="downsampleMethod">
+                  <option value="lttb">LTTB (推荐)</option>
+                  <option value="adaptive">自适应 LTTB</option>
+                  <option value="every_nth">等间隔</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row" style="margin-bottom:12px">
+              <div class="form-group">
+                <label class="form-label">开始时间</label>
+                <input class="form-input" id="historyStart" type="datetime-local">
+              </div>
+              <div class="form-group">
+                <label class="form-label">结束时间</label>
+                <input class="form-input" id="historyEnd" type="datetime-local">
+              </div>
+            </div>
+            <div class="time-picker" style="margin-bottom:12px">
+              <button class="time-btn" onclick="setTimeRange(5)">5分钟</button>
+              <button class="time-btn active" onclick="setTimeRange(15)">15分钟</button>
+              <button class="time-btn" onclick="setTimeRange(60)">1小时</button>
+              <button class="time-btn" onclick="setTimeRange(360)">6小时</button>
+              <button class="time-btn" onclick="setTimeRange(1440)">24小时</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="form-group" style="margin:0;width:120px">
+                <label class="form-label">目标点数</label>
+                <input class="form-input" id="targetPoints" type="number" value="300">
+              </div>
+              <button class="btn btn-primary" onclick="queryHistory()" style="margin-top:16px">查询</button>
+              <button class="btn" onclick="exportHistory()" style="margin-top:16px">导出 CSV</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📉 降采样结果</div>
+              <span class="badge badge-info" id="downsampleInfo">-</span>
+            </div>
+            <div class="card-body">
+              <div class="chart-container large" id="historyChart"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📊 统计摘要</div>
+            </div>
+            <div class="card-body" id="historyStats">
+              <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <div class="empty-text">请先执行查询</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-header">
+            <div class="card-title">📋 查询结果数据</div>
+            <span class="badge badge-info" id="historyDataCount">0 条</span>
+          </div>
+          <div class="card-body" style="padding:0;max-height:300px;overflow-y:auto">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间戳</th>
+                    <th>值</th>
+                    <th>来源</th>
+                    <th>标签</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Alerts Page ====== -->
+      <div class="page" id="page-alerts">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+          <div class="section-title">🔔 异常告警列表</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select class="form-select" id="alertStatusFilter" style="width:auto" onchange="filterAlerts()">
+              <option value="">全部状态</option>
+              <option value="active">活跃</option>
+              <option value="acknowledged">已确认</option>
+              <option value="resolved">已解决</option>
+              <option value="suppressed">已抑制</option>
+            </select>
+            <select class="form-select" id="alertSeverityFilter" style="width:auto" onchange="filterAlerts()">
+              <option value="">全部级别</option>
+              <option value="critical">严重</option>
+              <option value="warning">警告</option>
+              <option value="info">信息</option>
+            </select>
+            <button class="btn" onclick="loadAlerts()">🔄 刷新</button>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card red">
+            <div class="stat-label">活跃告警</div>
+            <div class="stat-value" id="activeAlerts">0</div>
+          </div>
+          <div class="stat-card yellow">
+            <div class="stat-label">已确认</div>
+            <div class="stat-value" id="ackAlerts">0</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-label">已解决</div>
+            <div class="stat-value" id="resolvedAlerts">0</div>
+          </div>
+          <div class="stat-card blue">
+            <div class="stat-label">已抑制</div>
+            <div class="stat-value" id="suppressedAlerts">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-body" style="padding:0">
+            <div id="alertsList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== Rules Page ====== -->
+      <div class="page" id="page-rules">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="section-title">⚙️ 规则管理</div>
+          <button class="btn btn-primary" onclick="showAddRuleModal()">+ 添加规则</button>
+        </div>
+
+        <div id="rulesList"></div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Rule Modal -->
+<div class="modal-overlay" id="ruleModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="ruleModalTitle">添加检测规则</div>
+      <button class="modal-close" onclick="closeModal('ruleModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">规则名称</label>
+        <input class="form-input" id="ruleName" placeholder="例: CPU 使用率异常">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">监控指标</label>
+          <input class="form-input" id="ruleMetric" placeholder="例: cpu.usage">
+        </div>
+        <div class="form-group">
+          <label class="form-label">检测算法</label>
+          <select class="form-select" id="ruleAlgorithm">
+            <option value="zscore">Z-Score</option>
+            <option value="ewma">EWMA</option>
+            <option value="moving_median">移动中位数</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">阈值</label>
+          <input class="form-input" id="ruleThreshold" type="number" value="3.0" step="0.1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">严重级别</label>
+          <select class="form-select" id="ruleSeverity">
+            <option value="info">信息</option>
+            <option value="warning" selected>警告</option>
+            <option value="critical">严重</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">窗口大小</label>
+          <input class="form-input" id="ruleWindowSize" type="number" value="200">
+        </div>
+        <div class="form-group">
+          <label class="form-label">EWMA Alpha</label>
+          <input class="form-input" id="ruleAlpha" type="number" value="0.3" step="0.05">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-checkbox">
+          <input type="checkbox" id="ruleDynamicThreshold">
+          启用动态阈值
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-checkbox">
+          <input type="checkbox" id="ruleEnabled" checked>
+          启用规则
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">描述</label>
+        <textarea class="form-input" id="ruleDescription" placeholder="规则说明..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('ruleModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveRule()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Source Modal -->
+<div class="modal-overlay" id="sourceModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">添加数据源</div>
+      <button class="modal-close" onclick="closeModal('sourceModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">数据源名称</label>
+        <input class="form-input" id="sourceName" placeholder="例: 生产服务器">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">类型</label>
+          <select class="form-select" id="sourceType">
+            <option value="api">API</option>
+            <option value="simulator">模拟器</option>
+            <option value="file">文件</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">采样间隔 (秒)</label>
+          <input class="form-input" id="sourceInterval" type="number" value="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">指标列表 (逗号分隔)</label>
+        <input class="form-input" id="sourceMetrics" placeholder="cpu.usage, memory.usage">
+      </div>
+      <div class="form-group">
+        <label class="form-checkbox">
+          <input type="checkbox" id="sourceEnabled" checked>
+          启用
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('sourceModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveSource()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script>
+// ====== Configuration ======
+const API_BASE = window.location.origin;
+const REFRESH_INTERVAL = 2000;
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+
+// ====== State ======
+let state = {
+  currentPage: 'dashboard',
+  metrics: [],
+  dashboardData: null,
+  alerts: [],
+  rules: [],
+  sources: {},
+  selectedDashMetrics: new Set(['cpu.usage', 'memory.usage']),
+  historyData: null,
+  timeRangeMinutes: 15,
+};
+
+let lineChart = null;
+let heatmapChart = null;
+let historyChartInstance = null;
+let refreshTimer = null;
+
+// ====== Init ======
+document.addEventListener('DOMContentLoaded', () => {
+  initCharts();
+  loadData();
+  refreshTimer = setInterval(refreshCurrentPage, REFRESH_INTERVAL);
+});
+
+// ====== Navigation ======
+function switchPage(page) {
+  state.currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelector(`.nav-item[data-page="${page}"]`).classList.add('active');
+
+  const titles = {
+    dashboard: '实时仪表盘',
+    sources: '数据源配置',
+    history: '历史查询',
+    alerts: '异常告警',
+    rules: '规则管理'
+  };
+  document.getElementById('pageTitle').textContent = titles[page];
+  document.getElementById('pageBreadcrumb').textContent = `${page} / overview`;
+
+  // Close mobile sidebar
+  document.getElementById('sidebar').classList.remove('open');
+
+  refreshCurrentPage();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ====== API Helpers ======
+async function api(path, options = {}) {
+  try {
+    const resp = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.json();
+  } catch (err) {
+    console.error(`API error: ${path}`, err);
+    return null;
+  }
+}
+
+// ====== Data Loading ======
+async function loadData() {
+  await Promise.all([
+    loadDashboard(),
+    loadAlerts(),
+    loadRules(),
+    loadSources(),
+    loadMetrics(),
+  ]);
+  updateHeaderStats();
+}
+
+async function refreshCurrentPage() {
+  switch (state.currentPage) {
+    case 'dashboard': await loadDashboard(); break;
+    case 'alerts': await loadAlerts(); break;
+    case 'history': break; // Manual refresh
+    case 'rules': await loadRules(); break;
+    case 'sources': await loadSources(); break;
+  }
+  updateHeaderStats();
+}
+
+// ====== Dashboard ======
+async function loadDashboard() {
+  const data = await api('/api/dashboard');
+  if (!data) {
+    document.getElementById('serverStatus').textContent = '连接失败';
+    return;
+  }
+  document.getElementById('serverStatus').textContent = '已连接';
+  state.dashboardData = data;
+  state.metrics = Object.keys(data.metrics || {});
+
+  renderStatsGrid(data);
+  renderDashMetricChips();
+  renderDashLineChart(data);
+  renderDashHeatmap(data);
+  renderRecentAlerts(data.recent_alerts || []);
+}
+
+function renderStatsGrid(data) {
+  const stats = data.stats || {};
+  const metrics = data.metrics || {};
+  const metricKeys = Object.keys(metrics);
+
+  let currentVals = metricKeys.map(m => metrics[m]?.current || 0);
+  let avgVals = metricKeys.map(m => metrics[m]?.avg || 0);
+
+  const html = `
+    <div class="stat-card blue">
+      <div class="stat-label">总指标数</div>
+      <div class="stat-value">${stats.metric_count || 0}</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">数据分片</div>
+      <div class="stat-value">${stats.shard_count || 0}</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">存储大小</div>
+      <div class="stat-value">${stats.total_size_mb || 0} MB</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">活跃告警</div>
+      <div class="stat-value">${stats.alert_count || 0}</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">检测规则</div>
+      <div class="stat-value">${stats.rule_count || 0}</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-label">缓存点数</div>
+      <div class="stat-value">${(stats.cache_size || 0).toLocaleString()}</div>
+    </div>
+  `;
+  document.getElementById('statsGrid').innerHTML = html;
+}
+
+function renderDashMetricChips() {
+  const container = document.getElementById('dashMetricChips');
+  const chips = state.metrics.map(m => {
+    const active = state.selectedDashMetrics.has(m) ? 'active' : '';
+    const type = m.split('.')[0];
+    return `<span class="metric-chip ${active}" data-metric="${type}" onclick="toggleDashMetric('${m}')">${m}</span>`;
+  }).join('');
+  container.innerHTML = chips;
+}
+
+function toggleDashMetric(metric) {
+  if (state.selectedDashMetrics.has(metric)) {
+    state.selectedDashMetrics.delete(metric);
+  } else {
+    state.selectedDashMetrics.add(metric);
+  }
+  renderDashMetricChips();
+  renderDashLineChart(state.dashboardData);
+}
+
+function renderDashLineChart(data) {
+  if (!lineChart || !data?.metrics) return;
+
+  const series = [];
+  const selectedMetrics = [...state.selectedDashMetrics];
+
+  selectedMetrics.forEach((metric, i) => {
+    const md = data.metrics[metric];
+    if (!md?.data) return;
+
+    series.push({
+      name: metric,
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2 },
+      areaStyle: { opacity: 0.08 },
+      color: CHART_COLORS[i % CHART_COLORS.length],
+      data: md.data.map(p => [p.t * 1000, p.v]),
+    });
+  });
+
+  lineChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(15,23,42,0.95)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      textStyle: { color: '#e2e8f0', fontSize: 11, fontFamily: 'JetBrains Mono' },
+      axisPointer: { type: 'cross', lineStyle: { color: 'rgba(255,255,255,0.1)' } },
+    },
+    legend: {
+      top: 0,
+      textStyle: { color: '#94a3b8', fontSize: 11, fontFamily: 'JetBrains Mono' },
+    },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'time',
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+      axisLabel: { color: '#64748b', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      splitLine: { lineStyle: { color: '#1e2d42', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+      axisLabel: { color: '#64748b', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      splitLine: { lineStyle: { color: '#1e2d42', type: 'dashed' } },
+    },
+    series,
+    animation: true,
+    animationDuration: 500,
+  }, true);
+}
+
+function renderDashHeatmap(data) {
+  if (!heatmapChart || !data?.metrics) return;
+
+  const metrics = Object.keys(data.metrics);
+  const hours = 24;
+  const heatData = [];
+
+  metrics.forEach((metric, yi) => {
+    const md = data.metrics[metric];
+    if (!md?.data) return;
+    // Group by minute
+    const buckets = {};
+    md.data.forEach(p => {
+      const d = new Date(p.t * 1000);
+      const minute = d.getMinutes();
+      const key = minute;
+      if (!buckets[key]) buckets[key] = [];
+      buckets[key].push(p.v);
+    });
+    Object.entries(buckets).forEach(([min, vals]) => {
+      const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+      heatData.push([parseInt(min), yi, Math.round(avg * 10) / 10]);
+    });
+  });
+
+  heatmapChart.setOption({
+    tooltip: {
+      backgroundColor: 'rgba(15,23,42,0.95)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      textStyle: { color: '#e2e8f0', fontSize: 11, fontFamily: 'JetBrains Mono' },
+      formatter: p => {
+        const [x, y, v] = p.data;
+        return `${metrics[y]}<br/>分钟: ${x}<br/>均值: ${v}`;
+      },
+    },
+    grid: { left: 120, right: 30, top: 10, bottom: 40 },
+    xAxis: {
+      type: 'category',
+      data: Array.from({length: 60}, (_, i) => i),
+      axisLabel: { color: '#64748b', fontSize: 9, fontFamily: 'JetBrains Mono', interval: 4 },
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+    },
+    yAxis: {
+      type: 'category',
+      data: metrics,
+      axisLabel: { color: '#94a3b8', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+    },
+    visualMap: {
+      min: 0,
+      max: 100,
+      calculable: true,
+      orient: 'horizontal',
+      left: 'center',
+      bottom: 0,
+      inRange: { color: ['#1e3a5f', '#2563eb', '#3b82f6', '#f59e0b', '#ef4444'] },
+      textStyle: { color: '#64748b', fontSize: 10 },
+      show: false,
+    },
+    series: [{
+      type: 'heatmap',
+      data: heatData,
+      emphasis: {
+        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.5)' },
+      },
+    }],
+    animation: true,
+  }, true);
+}
+
+function renderRecentAlerts(alerts) {
+  const container = document.getElementById('recentAlerts');
+  if (!alerts.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">暂无告警</div></div>';
+    return;
+  }
+
+  container.innerHTML = alerts.slice(0, 5).map(a => `
+    <div class="alert-item">
+      <div class="alert-severity ${a.severity || 'warning'}"></div>
+      <div class="alert-content">
+        <div class="alert-title">${a.metric} - ${a.rule_name || a.algorithm || '异常检测'}</div>
+        <div class="alert-meta">
+          <span>值: ${a.value?.toFixed(2) ?? '-'}</span>
+          <span>评分: ${a.score?.toFixed(2) ?? '-'}</span>
+          <span>${formatTime(a.timestamp)}</span>
+        </div>
+      </div>
+      <span class="badge badge-${a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'info'}">${a.severity || 'warning'}</span>
+    </div>
+  `).join('');
+}
+
+// ====== Sources ======
+async function loadSources() {
+  const data = await api('/api/sources');
+  if (!data) return;
+  state.sources = data.sources || {};
+  renderSources();
+}
+
+function renderSources() {
+  const container = document.getElementById('sourcesList');
+  const sources = Object.entries(state.sources);
+  document.getElementById('sourceCount').textContent = `${sources.length} 个`;
+
+  if (!sources.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔌</div><div class="empty-text">暂无数据源</div></div>';
+    return;
+  }
+
+  container.innerHTML = sources.map(([id, s]) => {
+    const iconClass = s.type === 'api' ? 'api' : s.type === 'simulator' ? 'sim' : 'file';
+    const icon = s.type === 'api' ? '🔌' : s.type === 'simulator' ? '🎲' : '📁';
+    return `
+      <div class="source-card" style="margin-bottom:8px">
+        <div class="source-icon ${iconClass}">${icon}</div>
+        <div class="source-info">
+          <div class="source-name">${s.name || id}</div>
+          <div class="source-type">${s.type} · ${s.enabled ? '启用' : '禁用'} · ${(s.metrics || []).join(', ')}</div>
+        </div>
+        <div class="source-actions">
+          <span class="badge ${s.enabled ? 'badge-success' : 'badge-warning'}">${s.enabled ? '在线' : '离线'}</span>
+          <button class="btn btn-sm btn-danger" onclick="deleteSource('${id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function showAddSourceModal() {
+  document.getElementById('sourceName').value = '';
+  document.getElementById('sourceType').value = 'api';
+  document.getElementById('sourceInterval').value = '1';
+  document.getElementById('sourceMetrics').value = '';
+  document.getElementById('sourceEnabled').checked = true;
+  openModal('sourceModal');
+}
+
+async function saveSource() {
+  const name = document.getElementById('sourceName').value.trim();
+  if (!name) { showToast('请输入数据源名称', 'error'); return; }
+
+  const source = {
+    name,
+    type: document.getElementById('sourceType').value,
+    interval: parseInt(document.getElementById('sourceInterval').value) || 1,
+    metrics: document.getElementById('sourceMetrics').value.split(',').map(s => s.trim()).filter(Boolean),
+    enabled: document.getElementById('sourceEnabled').checked,
+  };
+
+  const result = await api('/api/sources', { method: 'POST', body: source });
+  if (result?.success) {
+    showToast('数据源已保存', 'success');
+    closeModal('sourceModal');
+    await loadSources();
+  } else {
+    showToast('保存失败', 'error');
+  }
+}
+
+async function deleteSource(id) {
+  if (!confirm('确定删除此数据源?')) return;
+  const result = await api(`/api/sources/${id}`, { method: 'DELETE' });
+  if (result?.success) {
+    showToast('已删除', 'success');
+    await loadSources();
+  }
+}
+
+// ====== History ======
+async function loadMetrics() {
+  const data = await api('/api/data/metrics');
+  if (!data) return;
+
+  const select = document.getElementById('historyMetric');
+  const current = select.value;
+  select.innerHTML = (data.metrics || []).map(m =>
+    `<option value="${m}" ${m === current ? 'selected' : ''}>${m}</option>`
+  ).join('');
+
+  if (!select.value && data.metrics?.length) {
+    select.value = data.metrics[0];
+  }
+}
+
+function setTimeRange(minutes) {
+  state.timeRangeMinutes = minutes;
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+
+  const now = new Date();
+  const start = new Date(now.getTime() - minutes * 60000);
+  document.getElementById('historyStart').value = formatDatetimeLocal(start);
+  document.getElementById('historyEnd').value = formatDatetimeLocal(now);
+}
+
+async function queryHistory() {
+  const metric = document.getElementById('historyMetric').value;
+  if (!metric) { showToast('请选择指标', 'error'); return; }
+
+  const startStr = document.getElementById('historyStart').value;
+  const endStr = document.getElementById('historyEnd').value;
+  const target = parseInt(document.getElementById('targetPoints').value) || 300;
+  const method = document.getElementById('downsampleMethod').value;
+
+  let start, end;
+  if (startStr && endStr) {
+    start = new Date(startStr).getTime() / 1000;
+    end = new Date(endStr).getTime() / 1000;
+  } else {
+    end = Date.now() / 1000;
+    start = end - state.timeRangeMinutes * 60;
+  }
+
+  showToast('正在查询...', 'info');
+
+  const data = await api(`/api/data/downsample?metric=${encodeURIComponent(metric)}&start=${start}&end=${end}&target=${target}&method=${method}`);
+  if (!data) { showToast('查询失败', 'error'); return; }
+
+  state.historyData = data;
+  renderHistoryChart(data, metric);
+  renderHistoryStats(data);
+  renderHistoryTable(data.data || []);
+  document.getElementById('downsampleInfo').textContent = `${data.original_count} → ${data.downsampled_count} 点`;
+  showToast(`查询完成: ${data.downsampled_count} 点`, 'success');
+}
+
+function renderHistoryChart(data, metric) {
+  if (!historyChartInstance) return;
+
+  const points = (data.data || []).map(p => [p.t * 1000, p.v]);
+
+  historyChartInstance.setOption({
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(15,23,42,0.95)',
+      borderColor: 'rgba(255,255,255,0.1)',
+      textStyle: { color: '#e2e8f0', fontSize: 11, fontFamily: 'JetBrains Mono' },
+    },
+    legend: {
+      data: [metric],
+      top: 0,
+      textStyle: { color: '#94a3b8', fontSize: 11, fontFamily: 'JetBrains Mono' },
+    },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'time',
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+      axisLabel: { color: '#64748b', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      splitLine: { lineStyle: { color: '#1e2d42', type: 'dashed' } },
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#1e2d42' } },
+      axisLabel: { color: '#64748b', fontSize: 10, fontFamily: 'JetBrains Mono' },
+      splitLine: { lineStyle: { color: '#1e2d42', type: 'dashed' } },
+    },
+    series: [{
+      name: metric,
+      type: 'line',
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { width: 2, color: '#3b82f6' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(59,130,246,0.3)' },
+          { offset: 1, color: 'rgba(59,130,246,0.02)' },
+        ]),
+      },
+      data: points,
+    }],
+    dataZoom: [
+      { type: 'inside', start: 0, end: 100 },
+      { type: 'slider', start: 0, end: 100, height: 20, bottom: 5,
+        borderColor: '#1e2d42', fillerColor: 'rgba(59,130,246,0.15)',
+        textStyle: { color: '#64748b', fontSize: 10 },
+      },
+    ],
+    animation: true,
+  }, true);
+}
+
+function renderHistoryStats(data) {
+  const values = (data.data || []).map(p => p.v);
+  if (!values.length) return;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const avg = values.reduce((s, v) => s + v, 0) / values.length;
+  const sorted = [...values].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const std = Math.sqrt(values.reduce((s, v) => s + (v - avg) ** 2, 0) / values.length);
+
+  document.getElementById('historyStats').innerHTML = `
+    <div class="stats-grid" style="margin:0">
+      <div class="stat-card blue"><div class="stat-label">最小值</div><div class="stat-value">${min.toFixed(2)}</div></div>
+      <div class="stat-card green"><div class="stat-label">最大值</div><div class="stat-value">${max.toFixed(2)}</div></div>
+      <div class="stat-card yellow"><div class="stat-label">均值</div><div class="stat-value">${avg.toFixed(2)}</div></div>
+      <div class="stat-card purple"><div class="stat-label">中位数</div><div class="stat-value">${median.toFixed(2)}</div></div>
+      <div class="stat-card cyan"><div class="stat-label">标准差</div><div class="stat-value">${std.toFixed(2)}</div></div>
+      <div class="stat-card red"><div class="stat-label">数据点</div><div class="stat-value">${values.length}</div></div>
+    </div>
+  `;
+}
+
+function renderHistoryTable(data) {
+  const tbody = document.getElementById('historyTableBody');
+  document.getElementById('historyDataCount').textContent = `${data.length} 条`;
+
+  tbody.innerHTML = data.slice(-100).reverse().map(p => `
+    <tr>
+      <td style="font-family:var(--font-mono);font-size:11px">${formatTime(p.t)}</td>
+      <td style="font-family:var(--font-mono);font-weight:600">${p.v?.toFixed(4) ?? '-'}</td>
+      <td>${p.src || '-'}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${JSON.stringify(p.tags || {})}</td>
+    </tr>
+  `).join('');
+}
+
+function exportHistory() {
+  if (!state.historyData?.data?.length) {
+    showToast('无数据可导出', 'error');
+    return;
+  }
+  const rows = [['timestamp', 'value', 'source', 'tags']];
+  state.historyData.data.forEach(p => {
+    rows.push([new Date(p.t * 1000).toISOString(), p.v, p.src || '', JSON.stringify(p.tags || {})]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `timeseries_export_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('导出完成', 'success');
+}
+
+// ====== Alerts ======
+async function loadAlerts() {
+  const data = await api('/api/alerts');
+  if (!data) return;
+  state.alerts = data.alerts || [];
+  renderAlerts();
+  updateAlertBadge();
+}
+
+function filterAlerts() {
+  renderAlerts();
+}
+
+function renderAlerts() {
+  const statusFilter = document.getElementById('alertStatusFilter').value;
+  const severityFilter = document.getElementById('alertSeverityFilter').value;
+
+  let filtered = [...state.alerts];
+  if (statusFilter) filtered = filtered.filter(a => a.status === statusFilter);
+  if (severityFilter) filtered = filtered.filter(a => a.severity === severityFilter);
+
+  // Update counts
+  const counts = { active: 0, acknowledged: 0, resolved: 0, suppressed: 0 };
+  state.alerts.forEach(a => { if (counts[a.status] !== undefined) counts[a.status]++; });
+  document.getElementById('activeAlerts').textContent = counts.active;
+  document.getElementById('ackAlerts').textContent = counts.acknowledged;
+  document.getElementById('resolvedAlerts').textContent = counts.resolved;
+  document.getElementById('suppressedAlerts').textContent = counts.suppressed;
+
+  const container = document.getElementById('alertsList');
+  if (!filtered.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-text">暂无告警</div></div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(a => {
+    const severityClass = a.severity === 'critical' ? 'danger' : a.severity === 'warning' ? 'warning' : 'info';
+    const statusBadge = a.status === 'active' ? 'badge-danger' :
+                        a.status === 'acknowledged' ? 'badge-warning' :
+                        a.status === 'resolved' ? 'badge-success' : 'badge-info';
+    const statusText = a.status === 'active' ? '活跃' :
+                       a.status === 'acknowledged' ? '已确认' :
+                       a.status === 'resolved' ? '已解决' : '已抑制';
+
+    return `
+      <div class="alert-item">
+        <div class="alert-severity ${a.severity || 'warning'}"></div>
+        <div class="alert-content">
+          <div class="alert-title">${a.metric} · ${a.rule_name || a.algorithm || '异常'}</div>
+          <div class="alert-meta">
+            <span class="badge badge-${severityClass}">${a.severity || 'warning'}</span>
+            <span>值: <strong>${a.value?.toFixed(2) ?? '-'}</strong></span>
+            <span>评分: ${a.score?.toFixed(2) ?? '-'}</span>
+            <span>算法: ${a.algorithm || '-'}</span>
+            <span>${formatTime(a.timestamp)}</span>
+          </div>
+        </div>
+        <div class="alert-actions">
+          <span class="badge ${statusBadge}">${statusText}</span>
+          ${a.status === 'active' ? `<button class="btn btn-sm" onclick="ackAlert('${a.id}')">确认</button>` : ''}
+          ${a.status !== 'resolved' ? `<button class="btn btn-sm" onclick="resolveAlert('${a.id}')">解决</button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function ackAlert(id) {
+  const result = await api('/api/alerts/acknowledge', { method: 'POST', body: { alert_id: id } });
+  if (result?.success) { showToast('已确认', 'success'); await loadAlerts(); }
+}
+
+async function resolveAlert(id) {
+  const result = await api('/api/alerts/resolve', { method: 'POST', body: { alert_id: id } });
+  if (result?.success) { showToast('已解决', 'success'); await loadAlerts(); }
+}
+
+function updateAlertBadge() {
+  const active = state.alerts.filter(a => a.status === 'active').length;
+  document.getElementById('alertBadge').textContent = active;
+  document.getElementById('alertBadge').style.display = active > 0 ? '' : 'none';
+}
+
+// ====== Rules ======
+async function loadRules() {
+  const data = await api('/api/rules');
+  if (!data) return;
+  state.rules = data.rules || [];
+  renderRules();
+}
+
+function renderRules() {
+  const container = document.getElementById('rulesList');
+  if (!state.rules.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚙️</div><div class="empty-text">暂无规则</div></div>';
+    return;
+  }
+
+  container.innerHTML = state.rules.map(r => `
+    <div class="rule-card">
+      <div class="rule-header">
+        <div class="rule-name">${r.name || r.id}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${r.enabled ? 'badge-success' : 'badge-warning'}">${r.enabled ? '启用' : '禁用'}</span>
+          <button class="btn btn-sm" onclick="editRule('${r.id}')">编辑</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRule('${r.id}')">删除</button>
+        </div>
+      </div>
+      <dl class="rule-meta" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
+        <div><dt>指标</dt><dd>${r.metric}</dd></div>
+        <div><dt>算法</dt><dd>${r.algorithm}</dd></div>
+        <div><dt>阈值</dt><dd>${r.threshold}</dd></div>
+        <div><dt>级别</dt><dd><span class="badge badge-${r.severity === 'critical' ? 'danger' : r.severity === 'warning' ? 'warning' : 'info'}">${r.severity}</span></dd></div>
+        <div><dt>动态阈值</dt><dd>${r.dynamic_threshold ? '是' : '否'}</dd></div>
+        <div><dt>窗口</dt><dd>${r.params?.window_size || '-'}</dd></div>
+      </dl>
+      ${r.description ? `<div style="margin-top:8px;font-size:12px;color:var(--text-muted)">${r.description}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function showAddRuleModal() {
+  document.getElementById('ruleModalTitle').textContent = '添加检测规则';
+  document.getElementById('ruleName').value = '';
+  document.getElementById('ruleMetric').value = '';
+  document.getElementById('ruleAlgorithm').value = 'zscore';
+  document.getElementById('ruleThreshold').value = '3.0';
+  document.getElementById('ruleSeverity').value = 'warning';
+  document.getElementById('ruleWindowSize').value = '200';
+  document.getElementById('ruleAlpha').value = '0.3';
+  document.getElementById('ruleDynamicThreshold').checked = false;
+  document.getElementById('ruleEnabled').checked = true;
+  document.getElementById('ruleDescription').value = '';
+  document.getElementById('ruleModal').dataset.editId = '';
+  openModal('ruleModal');
+}
+
+function editRule(id) {
+  const rule = state.rules.find(r => r.id === id);
+  if (!rule) return;
+
+  document.getElementById('ruleModalTitle').textContent = '编辑规则';
+  document.getElementById('ruleName').value = rule.name || '';
+  document.getElementById('ruleMetric').value = rule.metric || '';
+  document.getElementById('ruleAlgorithm').value = rule.algorithm || 'zscore';
+  document.getElementById('ruleThreshold').value = rule.threshold || 3.0;
+  document.getElementById('ruleSeverity').value = rule.severity || 'warning';
+  document.getElementById('ruleWindowSize').value = rule.params?.window_size || 200;
+  document.getElementById('ruleAlpha').value = rule.params?.alpha || 0.3;
+  document.getElementById('ruleDynamicThreshold').checked = rule.dynamic_threshold || false;
+  document.getElementById('ruleEnabled').checked = rule.enabled !== false;
+  document.getElementById('ruleDescription').value = rule.description || '';
+  document.getElementById('ruleModal').dataset.editId = id;
+  openModal('ruleModal');
+}
+
+async function saveRule() {
+  const name = document.getElementById('ruleName').value.trim();
+  const metric = document.getElementById('ruleMetric').value.trim();
+  if (!name || !metric) { showToast('请填写名称和指标', 'error'); return; }
+
+  const editId = document.getElementById('ruleModal').dataset.editId;
+  const rule = {
+    id: editId || undefined,
+    name,
+    metric,
+    algorithm: document.getElementById('ruleAlgorithm').value,
+    threshold: parseFloat(document.getElementById('ruleThreshold').value) || 3.0,
+    severity: document.getElementById('ruleSeverity').value,
+    dynamic_threshold: document.getElementById('ruleDynamicThreshold').checked,
+    enabled: document.getElementById('ruleEnabled').checked,
+    description: document.getElementById('ruleDescription').value,
+    params: {
+      window_size: parseInt(document.getElementById('ruleWindowSize').value) || 200,
+      alpha: parseFloat(document.getElementById('ruleAlpha').value) || 0.3,
+    },
+  };
+
+  const result = await api('/api/rules', { method: 'POST', body: rule });
+  if (result?.success) {
+    showToast('规则已保存', 'success');
+    closeModal('ruleModal');
+    await loadRules();
+  } else {
+    showToast('保存失败', 'error');
+  }
+}
+
+async function deleteRule(id) {
+  if (!confirm('确定删除此规则?')) return;
+  const result = await api(`/api/rules/${id}`, { method: 'DELETE' });
+  if (result?.success) {
+    showToast('已删除', 'success');
+    await loadRules();
+  }
+}
+
+// ====== Simulation ======
+async function startSimulation() {
+  const metrics = document.getElementById('simMetrics').value.split(',').map(s => s.trim()).filter(Boolean);
+  const duration = parseInt(document.getElementById('simDuration').value) || 300;
+  const interval = parseFloat(document.getElementById('simInterval').value) || 1;
+
+  const result = await api('/api/simulate', {
+    method: 'POST',
+    body: { metrics, duration, interval },
+  });
+
+  if (result?.success) {
+    showToast(`模拟已启动 (${duration}秒)`, 'success');
+  } else {
+    showToast('启动失败', 'error');
+  }
+}
+
+// ====== Charts Init ======
+function initCharts() {
+  lineChart = echarts.init(document.getElementById('dashLineChart'));
+  heatmapChart = echarts.init(document.getElementById('dashHeatmap'));
+  historyChartInstance = echarts.init(document.getElementById('historyChart'));
+
+  window.addEventListener('resize', () => {
+    lineChart?.resize();
+    heatmapChart?.resize();
+    historyChartInstance?.resize();
+  });
+
+  // Set initial time range
+  const now = new Date();
+  const start = new Date(now.getTime() - 15 * 60000);
+  document.getElementById('historyStart').value = formatDatetimeLocal(start);
+  document.getElementById('historyEnd').value = formatDatetimeLocal(now);
+}
+
+// ====== Header Stats ======
+function updateHeaderStats() {
+  const stats = state.dashboardData?.stats || {};
+  document.getElementById('totalPoints').textContent = (stats.cache_size || 0).toLocaleString();
+  document.getElementById('metricCount').textContent = stats.metric_count || 0;
+  document.getElementById('alertCount').textContent = state.alerts.filter(a => a.status === 'active').length;
+}
+
+// ====== Modal Helpers ======
+function openModal(id) {
+  document.getElementById(id).classList.add('show');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// Close modals on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => {
+    if (e.target === el) el.classList.remove('show');
+  });
+});
+
+// ====== Toast ======
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.innerHTML = `<span>${type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ'}</span> ${message}`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ====== Utilities ======
+function formatTime(ts) {
+  if (!ts) return '-';
+  const d = new Date(typeof ts === 'number' && ts < 1e12 ? ts * 1000 : ts);
+  return d.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatDatetimeLocal(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+</script>
