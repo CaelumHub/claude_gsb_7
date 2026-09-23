@@ -8,11 +8,36 @@ Time-Series Storage Engine
 
 import json
 import os
+import re
 import time
 import threading
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
 from typing import List, Dict, Any, Optional, Tuple
+
+_SHARD_RE = re.compile(r"^(?P<metric>.+)_(?P<date>\d{8})_(?P<hour>\d{2})\.json$")
+
+
+def _safe_metric_name(metric: str) -> str:
+    """Convert a metric name to its shard-file-safe form."""
+    return metric.replace("/", "_").replace(".", "_").replace(" ", "_")
+
+
+def _parse_shard_filename(fname: str) -> Optional[Tuple[str, float]]:
+    """Parse a shard filename into (safe_metric, hour_start_timestamp).
+
+    Returns None for files that don't match the shard naming convention.
+    """
+    m = _SHARD_RE.match(fname)
+    if not m:
+        return None
+    try:
+        dt = datetime.strptime(f"{m.group('date')}{m.group('hour')}", "%Y%m%d%H")
+        dt = dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return m.group("metric"), dt.timestamp()
+
 
 class TimeSeriesStorage:
     """Manages time-series data with hourly JSON shard files."""
@@ -37,10 +62,21 @@ class TimeSeriesStorage:
         self._cache_lock = threading.Lock()
         self._max_cache_points = 50000
 
+        # Serializes shard deletions against buffer flushes
+        self._cleanup_lock = threading.Lock()
+
         # Load metadata and rules
         self.metadata = self._load_json(self.meta_file, {"sources": {}, "stats": {}})
         self.rules = self._load_json(self.rules_file, {"rules": []})
         self.alerts = self._load_json(self.alerts_file, {"alerts": [], "suppressed": {}})
+
+        # Retention / auto-cleanup policy (persisted in metadata.json)
+        self.retention = self.metadata.get("retention", {
+            "enabled": False,
+            "retention_days": 7,
+            "auto_cleanup": False,
+        })
+        self.last_cleanup = self.metadata.get("last_cleanup")
 
     def _load_json(self, path: str, default: Any) -> Any:
         """Load JSON file with fallback to default."""
@@ -68,7 +104,7 @@ class TimeSeriesStorage:
         """Get the hourly shard file path for a metric and timestamp."""
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         shard_key = dt.strftime("%Y%m%d_%H")
-        safe_metric = metric.replace("/", "_").replace(".", "_").replace(" ", "_")
+        safe_metric = _safe_metric_name(metric)
         return os.path.join(self.ts_dir, f"{safe_metric}_{shard_key}.json")
 
     def _get_shard_key(self, metric: str, timestamp: float) -> str:
@@ -257,6 +293,212 @@ class TimeSeriesStorage:
                         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat()
                     })
         return sorted(info, key=lambda x: x["file"])
+
+    # ---- Storage usage & retention ----
+
+    def _scan_shards(self) -> List[Tuple[str, str, float, int]]:
+        """Scan the timeseries directory and return
+        (filename, safe_metric, hour_start_ts, size_bytes) tuples."""
+        shards = []
+        if not os.path.exists(self.ts_dir):
+            return shards
+        for fname in os.listdir(self.ts_dir):
+            parsed = _parse_shard_filename(fname)
+            if parsed is None:
+                continue
+            safe_metric, hour_ts = parsed
+            try:
+                size = os.path.getsize(os.path.join(self.ts_dir, fname))
+            except OSError:
+                continue
+            shards.append((fname, safe_metric, hour_ts, size))
+        return shards
+
+    def _resolve_metric_names(self, safe_names: set) -> Dict[str, str]:
+        """Map safe metric names back to the original metric names when known."""
+        candidates = set()
+        with self._cache_lock:
+            candidates.update(self._cache.keys())
+        try:
+            candidates.update(self.get_metrics())
+        except OSError:
+            pass
+        mapping: Dict[str, str] = {}
+        for name in candidates:
+            mapping[_safe_metric_name(name)] = name
+        return {safe: mapping.get(safe, safe) for safe in safe_names}
+
+    def get_metric_storage(self) -> Dict[str, Any]:
+        """Get per-metric shard storage usage."""
+        shards = self._scan_shards()
+        name_map = self._resolve_metric_names({s[1] for s in shards})
+
+        agg: Dict[str, Dict[str, Any]] = {}
+        total_size = 0
+        for fname, safe_metric, hour_ts, size in shards:
+            total_size += size
+            metric = name_map.get(safe_metric, safe_metric)
+            entry = agg.setdefault(metric, {
+                "metric": metric,
+                "shard_count": 0,
+                "size_bytes": 0,
+                "oldest_shard_ts": hour_ts,
+                "latest_shard_ts": hour_ts,
+            })
+            entry["shard_count"] += 1
+            entry["size_bytes"] += size
+            entry["oldest_shard_ts"] = min(entry["oldest_shard_ts"], hour_ts)
+            # Shard covers data within that hour; latest data may be up to hour end
+            entry["latest_shard_ts"] = max(entry["latest_shard_ts"], hour_ts + 3600)
+
+        now = time.time()
+        cutoff = self._retention_cutoff(now)
+        metrics = []
+        for entry in agg.values():
+            size = entry["size_bytes"]
+            metrics.append({
+                **entry,
+                "size_kb": round(size / 1024, 2),
+                "size_mb": round(size / (1024 * 1024), 2),
+                "percent": round(size * 100.0 / total_size, 1) if total_size else 0.0,
+                "expired_shards": sum(
+                    1 for _, sm, hour_ts, _ in shards
+                    if name_map.get(sm, sm) == entry["metric"] and cutoff is not None
+                    and hour_ts + 3600 <= cutoff
+                ),
+            })
+        metrics.sort(key=lambda x: x["size_bytes"], reverse=True)
+
+        return {
+            "total_size_bytes": total_size,
+            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            "total_shards": len(shards),
+            "metric_count": len(metrics),
+            "metrics": metrics,
+        }
+
+    def _retention_cutoff(self, now: Optional[float] = None) -> Optional[float]:
+        """Timestamp before which data is considered expired."""
+        days = self.retention.get("retention_days")
+        if not days:
+            return None
+        return (now or time.time()) - float(days) * 86400
+
+    def get_retention_policy(self) -> Dict[str, Any]:
+        """Get the configured retention / auto-cleanup policy."""
+        return {
+            "enabled": bool(self.retention.get("enabled", False)),
+            "retention_days": int(self.retention.get("retention_days", 7)),
+            "auto_cleanup": bool(self.retention.get("auto_cleanup", False)),
+            "cutoff_ts": self._retention_cutoff(),
+            "last_cleanup": self.last_cleanup,
+        }
+
+    def set_retention_policy(self, policy: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist the retention / auto-cleanup policy."""
+        days = int(policy.get("retention_days", self.retention.get("retention_days", 7)))
+        if days < 1 or days > 3650:
+            raise ValueError("retention_days must be between 1 and 3650")
+        self.retention = {
+            "enabled": bool(policy.get("enabled", self.retention.get("enabled", False))),
+            "retention_days": days,
+            "auto_cleanup": bool(policy.get("auto_cleanup",
+                                           self.retention.get("auto_cleanup", False))),
+        }
+        self.metadata["retention"] = self.retention
+        self._save_json(self.meta_file, self.metadata)
+        return self.get_retention_policy()
+
+    def cleanup_expired(self, retention_days: Optional[int] = None,
+                        dry_run: bool = False) -> Dict[str, Any]:
+        """Delete hourly shard files that are entirely older than the retention window.
+
+        A shard is only deleted when its full hour (hour_start + 3600) is at or
+        before the cutoff, so shards overlapping the retention window are kept.
+        Current (unflushed) buffered data and the in-memory cache are untouched.
+        """
+        days = int(retention_days) if retention_days is not None \
+            else int(self.retention.get("retention_days", 7))
+        if days < 1:
+            raise ValueError("retention_days must be >= 1")
+
+        now = time.time()
+        cutoff = now - days * 86400
+
+        # Hold the buffer lock for the whole operation: no flush can rewrite a
+        # shard while we are deleting it.
+        with self._cleanup_lock, self._buffer_lock:
+            if not dry_run:
+                self._flush_buffer()
+
+            deleted_files = []
+            deleted_bytes = 0
+            kept_files = []
+            tmp_removed = 0
+
+            for fname in os.listdir(self.ts_dir):
+                fpath = os.path.join(self.ts_dir, fname)
+
+                # Remove stale temp files left behind by interrupted writes
+                if fname.endswith('.tmp'):
+                    if not dry_run:
+                        try:
+                            os.remove(fpath)
+                        except OSError:
+                            pass
+                    tmp_removed += 1
+                    continue
+
+                parsed = _parse_shard_filename(fname)
+                if parsed is None:
+                    continue
+
+                _safe_metric, hour_ts = parsed
+                try:
+                    size = os.path.getsize(fpath)
+                except OSError:
+                    continue
+
+                # Expire only fully-closed hours beyond the cutoff
+                if hour_ts + 3600 <= cutoff:
+                    if not dry_run:
+                        try:
+                            os.remove(fpath)
+                        except OSError:
+                            continue
+                    deleted_files.append(fname)
+                    deleted_bytes += size
+                else:
+                    kept_files.append(fname)
+
+        # Drop expired points from the in-memory cache as well (cache is a
+        # recent-data hot cache; deleting old entries cannot affect new data).
+        with self._cache_lock:
+            if not dry_run:
+                for metric in list(self._cache.keys()):
+                    self._cache[metric] = [p for p in self._cache[metric]
+                                           if p["t"] >= cutoff]
+
+        result = {
+            "dry_run": dry_run,
+            "retention_days": days,
+            "cutoff_ts": cutoff,
+            "cutoff_time": datetime.fromtimestamp(cutoff, tz=timezone.utc).isoformat(),
+            "executed_at": datetime.fromtimestamp(now, tz=timezone.utc).isoformat(),
+            "deleted_shards": len(deleted_files),
+            "deleted_bytes": deleted_bytes,
+            "deleted_mb": round(deleted_bytes / (1024 * 1024), 2),
+            "kept_shards": len(kept_files),
+            "tmp_files_removed": tmp_removed,
+            "files": sorted(deleted_files),
+        }
+
+        if not dry_run:
+            self.last_cleanup = result
+            self.metadata["last_cleanup"] = result
+            self._save_json(self.meta_file, self.metadata)
+
+        return result
 
     # ---- Metadata (Sources) ----
 

@@ -116,6 +116,37 @@ curl -X POST http://localhost:8080/api/simulate \
   -d '{"metrics":["cpu.usage","memory.usage"],"duration":300,"interval":1}'
 ```
 
+### 存储占用与数据保留
+
+```bash
+# 查看每个指标的存储占用（分片数、大小、占比、可清理分片）
+curl http://localhost:8080/api/storage/metrics
+
+# 查看保留策略
+curl http://localhost:8080/api/retention
+
+# 配置保留策略（保留 7 天，启用每小时自动清理）
+curl -X POST http://localhost:8080/api/retention \
+  -H "Content-Type: application/json" \
+  -d '{"enabled":true,"retention_days":7,"auto_cleanup":true}'
+
+# 预览可清理的过期分片（不删除任何文件）
+curl -X POST http://localhost:8080/api/storage/cleanup \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run":true}'
+
+# 立即执行清理（删除早于保留窗口的整小时分片）
+curl -X POST http://localhost:8080/api/storage/cleanup \
+  -H "Content-Type: application/json" \
+  -d '{"retention_days":7}'
+```
+
+清理以小时分片为单位：仅当某分片覆盖的完整小时（`hour_start + 3600`）
+早于截止时间时才删除，因此跨越保留边界的分片会被保留，当前缓冲区、
+内存缓存及保留期内数据不受影响。启用 `auto_cleanup` 后，后端守护线程
+每小时自动执行一次清理。
+
+
 ## 存储设计
 
 ### 时序数据分片
